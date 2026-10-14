@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+requests
+pyotp
+qrcode[pil]
+jinja2
+google-genai
+python-dotenv

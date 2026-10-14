@@ -1,0 +1,16 @@
+# Secretos
+.env
+*.db
+qr_*.png
+
+# Python
+__pycache__/
+*.pyc
+*.save
+venv/
+.venv/
+
+# Editor / sistema
+.vscode/
+.idea/
+.DS_Store

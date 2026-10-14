@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Autenticacion Inteligente</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; background: #0f3460;
+         display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+  .card { background: #16213e; padding: 40px; border-radius: 12px; width: 380px;
+          color: white; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+  h2 { text-align: center; margin-bottom: 8px; font-size: 22px; }
+  .subtitulo { text-align: center; color: #aaa; font-size: 13px; margin-bottom: 24px; }
+  input { width: 100%; padding: 12px 16px; margin: 6px 0; border-radius: 8px;
+          border: 1px solid #333; background: #0f3460; color: white; font-size: 14px; }
+  input:focus { outline: none; border-color: #e94560; }
+  button { width: 100%; padding: 13px; background: #e94560; color: white; border: none;
+           border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: bold;
+           margin-top: 14px; }
+  button:hover { background: #c73652; }
+  #resultado { margin-top: 16px; padding: 14px; border-radius: 8px; text-align: center;
+               font-weight: bold; display: none; }
+  .permitido { background: #2d6a4f; border: 1px solid #52b788; }
+  .mfa { background: #856404; border: 1px solid #e9c46a; color: #fff3cd; }
+  .bloqueado { background: #7b1d1d; border: 1px solid #e94560; }
+  .error { background: #444; border: 1px solid #888; }
+  #mfa-section { display: none; margin-top: 16px; }
+  .score-badge { display: inline-block; padding: 2px 10px; border-radius: 20px;
+                 background: rgba(255,255,255,0.2); font-size: 12px; margin-top: 6px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h2>Login Seguro</h2>
+    <p class="subtitulo">Sistema de Autenticacion Inteligente - ITLA</p>
+
+    <div id="login-section">
+      <input type="text" id="username" placeholder="Usuario">
+      <input type="password" id="password" placeholder="Contrasena">
+      <button onclick="iniciarSesion()" id="btn-login">Iniciar Sesion</button>
+    </div>
+
+    <div id="mfa-section">
+      <p style="color:#e9c46a; margin-bottom:10px; font-size:14px;">
+        Verificacion adicional requerida.<br>
+        Abre Google Authenticator e ingresa el codigo.
+      </p>
+      <input type="text" id="codigo-mfa" placeholder="Codigo de 6 digitos" maxlength="6">
+      <button onclick="verificarMFA()">Verificar Codigo</button>
+    </div>
+
+    <div id="resultado"></div>
+  </div>
+
+<script>
+let usuarioActual = "";
+
+async function iniciarSesion() {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (!username || !password) { mostrar('error', 'Completa todos los campos'); return; }
+
+  const btn = document.getElementById('btn-login');
+  btn.textContent = 'Verificando...';
+
+  try {
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, timezone })
+    });
+    const data = await response.json();
+    usuarioActual = username;
+    procesarRespuesta(data);
+  } catch (e) {
+    mostrar('error', 'Error de conexion con el servidor');
+  } finally {
+    btn.textContent = 'Iniciar Sesion';
+  }
+}
+
+async function verificarMFA() {
+  const codigo = document.getElementById('codigo-mfa').value.trim();
+  if (codigo.length !== 6) { mostrar('error', 'El codigo debe tener 6 digitos'); return; }
+  const response = await fetch('/api/verificar-mfa', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: usuarioActual, codigo })
+  });
+  const data = await response.json();
+  procesarRespuesta(data);
+}
+
+function procesarRespuesta(data) {
+  const mfaSection = document.getElementById('mfa-section');
+  if (data.status === 'permitido') {
+    mfaSection.style.display = 'none';
+    mostrar('permitido', 'Acceso Permitido<br><span class="score-badge">Score: ' +
+            (data.score || 0) + '</span><br><small>' + (data.pais || '') + '</small>');
+  } else if (data.status === 'mfa_requerido') {
+    mfaSection.style.display = 'block';
+    mostrar('mfa', 'Verificacion Requerida<br><span class="score-badge">Score: ' +
+            data.score + '</span>');
+  } else if (data.status === 'bloqueado') {
+    mfaSection.style.display = 'none';
+    const razon = data.razones && data.razones.length > 0 ? data.razones[0] : '';
+    mostrar('bloqueado', 'Acceso Bloqueado<br><span class="score-badge">Score: ' +
+            data.score + '</span><br><small>' + data.pais + ' - ' + razon + '</small>');
+  } else {
+    mostrar('error', (data.mensaje || 'Error desconocido'));
+  }
+}
+
+function mostrar(tipo, html) {
+  const r = document.getElementById('resultado');
+  r.className = tipo;
+  r.innerHTML = html;
+  r.style.display = 'block';
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    if (document.getElementById('mfa-section').style.display === 'block') verificarMFA();
+    else iniciarSesion();
+  }
+});
+</script>
+</body>
+</html>
