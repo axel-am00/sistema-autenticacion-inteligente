@@ -99,11 +99,15 @@ async def login(data: LoginRequest, request: Request):
 
 @app.post("/api/verificar-mfa")
 async def verificar_mfa(data: MFARequest):
+    if esta_bloqueado(data.username):
+        return {"status": "error", "mensaje": "Cuenta bloqueada temporalmente."}
     secret = obtener_secret_mfa(data.username)
     if not secret:
-        return {"status": "error", "mensaje": "Usuario no encontrado"}
+        return {"status": "error", "mensaje": "Codigo incorrecto"}
     if verificar_codigo(secret, data.codigo):
+        resetear_intentos(data.username)
         return {"status": "permitido", "mensaje": "Acceso concedido"}
+    registrar_intento_fallido(data.username)
     return {"status": "error", "mensaje": "Codigo incorrecto"}
 
 
@@ -120,4 +124,4 @@ async def ver_logs():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)
